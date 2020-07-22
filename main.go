@@ -36,8 +36,9 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			if !ok {
 				return true
 			}
+
 			needArg := 1
-			handler := func(stmt sqlAST.StmtNode, argCnt int) error {
+			handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 				return nil
 			}
 			switch se.Sel.Name {
@@ -64,7 +65,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				pass.Reportf(n.Pos(), "args mismatch")
 				return true
 			}
-			argCnt := len(ce.Args[needArg:])
 
 			p := parser.New()
 			astSQL, ok := ce.Args[needArg-1].(*ast.BasicLit)
@@ -79,7 +79,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 			sn := sns[0]
-			if err := handler(sn, argCnt); err != nil {
+			if err := handler(sn, ce.Args[needArg:], ce.Ellipsis.IsValid()); err != nil {
 				pass.Reportf(n.Pos(), err.Error())
 			}
 			return true
@@ -88,7 +88,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 	return nil, nil
 }
 
-func handleQuery(stmt sqlAST.StmtNode, argCnt int) error {
+func handleQuery(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
 		return errors.New("not select in do Query")
@@ -105,13 +105,16 @@ func handleQuery(stmt sqlAST.StmtNode, argCnt int) error {
 			placeHolderNum++
 		}
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 }
 
-func handleQueryContext(stmt sqlAST.StmtNode, argCnt int) error {
+func handleQueryContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
 		return errors.New("not select in do Query")
@@ -128,38 +131,44 @@ func handleQueryContext(stmt sqlAST.StmtNode, argCnt int) error {
 			placeHolderNum++
 		}
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 }
 
-func handleExecContext(stmt sqlAST.StmtNode, argCnt int) error {
+func handleExecContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	switch t := stmt.(type) {
 	case *sqlAST.InsertStmt:
-		return handleInsert(t, argCnt)
+		return handleInsert(t, args, hasEllipsis)
 	case *sqlAST.DeleteStmt:
-		return handleDelete(t, argCnt)
+		return handleDelete(t, args, hasEllipsis)
 	case *sqlAST.UpdateStmt:
-		return handleUpdate(t, argCnt)
+		return handleUpdate(t, args, hasEllipsis)
 	default:
 		panic(fmt.Sprintf("unexpected stmt:%s", stmt.Text()))
 	}
 
 }
 
-func handleInsert(ss *sqlAST.InsertStmt, argCnt int) error {
+func handleInsert(ss *sqlAST.InsertStmt, args []ast.Expr, hasEllipsis bool) error {
 	placeHolderNum := 0
 	for _, each := range ss.Lists {
 		placeHolderNum += len(each)
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 }
 
-func handleDelete(ss *sqlAST.DeleteStmt, argCnt int) error {
+func handleDelete(ss *sqlAST.DeleteStmt, args []ast.Expr, hasEllipsis bool) error {
 	placeHolderNum := 0
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
@@ -173,13 +182,16 @@ func handleDelete(ss *sqlAST.DeleteStmt, argCnt int) error {
 			placeHolderNum++
 		}
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 }
 
-func handleUpdate(ss *sqlAST.UpdateStmt, argCnt int) error {
+func handleUpdate(ss *sqlAST.UpdateStmt, args []ast.Expr, hasEllipsis bool) error {
 	placeHolderNum := 0
 	for _, each := range ss.List {
 		_, ok := each.Expr.(*driver.ParamMarkerExpr)
@@ -187,6 +199,7 @@ func handleUpdate(ss *sqlAST.UpdateStmt, argCnt int) error {
 			placeHolderNum++
 		}
 	}
+
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
@@ -198,14 +211,17 @@ func handleUpdate(ss *sqlAST.UpdateStmt, argCnt int) error {
 			placeHolderNum++
 		}
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 
 }
 
-func handleQueryRow(stmt sqlAST.StmtNode, argCnt int) error {
+func handleQueryRow(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
 		return errors.New("not select in do Query")
@@ -222,13 +238,16 @@ func handleQueryRow(stmt sqlAST.StmtNode, argCnt int) error {
 			placeHolderNum++
 		}
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 }
 
-func handleQueryRowContext(stmt sqlAST.StmtNode, argCnt int) error {
+func handleQueryRowContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
 		return errors.New("not select in do Query")
@@ -245,20 +264,23 @@ func handleQueryRowContext(stmt sqlAST.StmtNode, argCnt int) error {
 			placeHolderNum++
 		}
 	}
-	if placeHolderNum != argCnt {
+	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
+		return nil
+	}
+	if placeHolderNum != len(args) {
 		return errors.New("argcnt mismatch")
 	}
 	return nil
 }
 
-func handleExec(stmt sqlAST.StmtNode, argCnt int) error {
+func handleExec(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	switch t := stmt.(type) {
 	case *sqlAST.InsertStmt:
-		return handleInsert(t, argCnt)
+		return handleInsert(t, args, hasEllipsis)
 	case *sqlAST.DeleteStmt:
-		return handleDelete(t, argCnt)
+		return handleDelete(t, args, hasEllipsis)
 	case *sqlAST.UpdateStmt:
-		return handleUpdate(t, argCnt)
+		return handleUpdate(t, args, hasEllipsis)
 	default:
 		panic(fmt.Sprintf("unexpected stmt:%s", stmt.Text()))
 	}
