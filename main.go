@@ -97,11 +97,13 @@ func handleQuery(stmt sqlAST.StmtNode, argCnt int) error {
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
-	if ss.Limit.Offset != nil {
-		placeHolderNum++
-	}
-	if ss.Limit.Count != nil {
-		placeHolderNum++
+	if ss.Limit != nil {
+		if ss.Limit.Offset != nil {
+			placeHolderNum++
+		}
+		if ss.Limit.Count != nil {
+			placeHolderNum++
+		}
 	}
 	if placeHolderNum != argCnt {
 		return errors.New("argcnt mismatch")
@@ -118,11 +120,13 @@ func handleQueryContext(stmt sqlAST.StmtNode, argCnt int) error {
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
-	if ss.Limit.Offset != nil {
-		placeHolderNum++
-	}
-	if ss.Limit.Count != nil {
-		placeHolderNum++
+	if ss.Limit != nil {
+		if ss.Limit.Offset != nil {
+			placeHolderNum++
+		}
+		if ss.Limit.Count != nil {
+			placeHolderNum++
+		}
 	}
 	if placeHolderNum != argCnt {
 		return errors.New("argcnt mismatch")
@@ -160,6 +164,15 @@ func handleDelete(ss *sqlAST.DeleteStmt, argCnt int) error {
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
+
+	if ss.Limit != nil {
+		if ss.Limit.Offset != nil {
+			placeHolderNum++
+		}
+		if ss.Limit.Count != nil {
+			placeHolderNum++
+		}
+	}
 	if placeHolderNum != argCnt {
 		return errors.New("argcnt mismatch")
 	}
@@ -177,6 +190,14 @@ func handleUpdate(ss *sqlAST.UpdateStmt, argCnt int) error {
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
+	if ss.Limit != nil {
+		if ss.Limit.Offset != nil {
+			placeHolderNum++
+		}
+		if ss.Limit.Count != nil {
+			placeHolderNum++
+		}
+	}
 	if placeHolderNum != argCnt {
 		return errors.New("argcnt mismatch")
 	}
@@ -193,11 +214,13 @@ func handleQueryRow(stmt sqlAST.StmtNode, argCnt int) error {
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
-	if ss.Limit.Offset != nil {
-		placeHolderNum++
-	}
-	if ss.Limit.Count != nil {
-		placeHolderNum++
+	if ss.Limit != nil {
+		if ss.Limit.Offset != nil {
+			placeHolderNum++
+		}
+		if ss.Limit.Count != nil {
+			placeHolderNum++
+		}
 	}
 	if placeHolderNum != argCnt {
 		return errors.New("argcnt mismatch")
@@ -214,11 +237,13 @@ func handleQueryRowContext(stmt sqlAST.StmtNode, argCnt int) error {
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
 	}
-	if ss.Limit.Offset != nil {
-		placeHolderNum++
-	}
-	if ss.Limit.Count != nil {
-		placeHolderNum++
+	if ss.Limit != nil {
+		if ss.Limit.Offset != nil {
+			placeHolderNum++
+		}
+		if ss.Limit.Count != nil {
+			placeHolderNum++
+		}
 	}
 	if placeHolderNum != argCnt {
 		return errors.New("argcnt mismatch")
