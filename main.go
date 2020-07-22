@@ -90,7 +90,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 func handleQuery(stmt sqlAST.StmtNode, argCnt int) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
-	if ok {
+	if !ok {
 		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
@@ -105,7 +105,7 @@ func handleQuery(stmt sqlAST.StmtNode, argCnt int) error {
 
 func handleQueryContext(stmt sqlAST.StmtNode, argCnt int) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
-	if ok {
+	if !ok {
 		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
@@ -174,7 +174,7 @@ func handleUpdate(ss *sqlAST.UpdateStmt, argCnt int) error {
 
 func handleQueryRow(stmt sqlAST.StmtNode, argCnt int) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
-	if ok {
+	if !ok {
 		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
@@ -189,7 +189,7 @@ func handleQueryRow(stmt sqlAST.StmtNode, argCnt int) error {
 
 func handleQueryRowContext(stmt sqlAST.StmtNode, argCnt int) error {
 	ss, ok := stmt.(*sqlAST.SelectStmt)
-	if ok {
+	if !ok {
 		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
