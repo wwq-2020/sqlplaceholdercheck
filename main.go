@@ -43,8 +43,8 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 			needArg := 1
-			handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
-				return 0, nil
+			handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
+				return nil
 			}
 			switch se.Sel.Name {
 			case "Query":
@@ -104,7 +104,7 @@ func run(pass *analysis.Pass) (interface{}, error) {
 				return true
 			}
 			sn := sns[0]
-			if _, err := handler(sn, ce.Args[needArg:], ce.Ellipsis.IsValid()); err != nil {
+			if err := handler(sn, ce.Args[needArg:], ce.Ellipsis.IsValid()); err != nil {
 				pass.Reportf(n.Pos(), err.Error())
 			}
 			return true
@@ -147,8 +147,8 @@ func handleScanForQuery(ce *ast.CallExpr, se *ast.SelectorExpr) error {
 	}
 
 	needArg := 1
-	handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
-		return 0, nil
+	handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
+		return nil
 	}
 	switch se2.Sel.Name {
 	case "Query":
@@ -176,11 +176,16 @@ func handleScanForQuery(ce *ast.CallExpr, se *ast.SelectorExpr) error {
 		return nil
 	}
 	sn := sns[0]
-	placeHolderNum, err := handler(sn, ce2.Args[needArg:], ce2.Ellipsis.IsValid())
-	if err != nil {
+	if err := handler(sn, ce2.Args[needArg:], ce2.Ellipsis.IsValid()); err != nil {
 		return nil
 	}
-	if placeHolderNum != len(ce.Args) {
+	ss := sn.(*sqlAST.SelectStmt)
+	columnCnt := 0
+	if ss != nil && ss.Fields != nil {
+		columnCnt = len(ss.Fields.Fields)
+	}
+
+	if columnCnt != len(ce.Args) {
 		return errors.New("scan arg mismatch")
 	}
 	return nil
@@ -192,12 +197,15 @@ func handleScanForQueryRow(ce, ce2 *ast.CallExpr, se, se2 *ast.SelectorExpr) err
 		return nil
 	}
 	needArg := 1
-	handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
-		return 0, nil
+	handler := func(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
+		return nil
 	}
 	switch se2.Sel.Name {
 	case "QueryRow":
 		handler = handleQueryRow
+	case "QueryRowContext":
+		handler = handleQueryRowContext
+		needArg++
 	default:
 		return nil
 	}
@@ -218,23 +226,29 @@ func handleScanForQueryRow(ce, ce2 *ast.CallExpr, se, se2 *ast.SelectorExpr) err
 		return nil
 	}
 	sn := sns[0]
-	placeHolderNum, err := handler(sn, ce2.Args[needArg:], ce2.Ellipsis.IsValid())
-	if err != nil {
+	if err := handler(sn, ce2.Args[needArg:], ce2.Ellipsis.IsValid()); err != nil {
 		return nil
 	}
-	if placeHolderNum != len(ce.Args) {
+
+	columnCnt := 0
+	ss := sn.(*sqlAST.SelectStmt)
+
+	if ss != nil && ss.Fields != nil {
+		columnCnt = len(ss.Fields.Fields)
+	}
+	if columnCnt != len(ce.Args) {
 		return errors.New("scan arg mismatch")
 	}
 	return nil
 }
 
-func handleQuery(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleQuery(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	if stmt == nil {
-		return 0, nil
+		return nil
 	}
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
-		return 0, errors.New("not select in do Query")
+		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
 	if ss.Where != nil {
@@ -249,21 +263,21 @@ func handleQuery(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, 
 		}
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("query arg count mismatch")
+		return errors.New("query arg count mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleQueryContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleQueryContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	if stmt == nil {
-		return 0, nil
+		return nil
 	}
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
-		return 0, errors.New("not select in do Query")
+		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
 	if ss.Where != nil {
@@ -278,17 +292,17 @@ func handleQueryContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool)
 		}
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("query arg count mismatch")
+		return errors.New("query arg count mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleExecContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleExecContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	if stmt == nil {
-		return 0, nil
+		return nil
 	}
 	switch t := stmt.(type) {
 	case *sqlAST.InsertStmt:
@@ -303,21 +317,21 @@ func handleExecContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) 
 
 }
 
-func handleInsert(ss *sqlAST.InsertStmt, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleInsert(ss *sqlAST.InsertStmt, args []ast.Expr, hasEllipsis bool) error {
 	placeHolderNum := 0
 	for _, each := range ss.Lists {
 		placeHolderNum += len(each)
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("argcnt mismatch")
+		return errors.New("argcnt mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleDelete(ss *sqlAST.DeleteStmt, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleDelete(ss *sqlAST.DeleteStmt, args []ast.Expr, hasEllipsis bool) error {
 	placeHolderNum := 0
 	if ss.Where != nil {
 		placeHolderNum = calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), placeHolderNum)
@@ -332,15 +346,15 @@ func handleDelete(ss *sqlAST.DeleteStmt, args []ast.Expr, hasEllipsis bool) (int
 		}
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("delete arg count mismatch")
+		return errors.New("delete arg count mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleUpdate(ss *sqlAST.UpdateStmt, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleUpdate(ss *sqlAST.UpdateStmt, args []ast.Expr, hasEllipsis bool) error {
 	placeHolderNum := 0
 	for _, each := range ss.List {
 		_, ok := each.Expr.(*driver.ParamMarkerExpr)
@@ -361,21 +375,21 @@ func handleUpdate(ss *sqlAST.UpdateStmt, args []ast.Expr, hasEllipsis bool) (int
 		}
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("update arg count mismatch")
+		return errors.New("update arg count mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleQueryRow(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleQueryRow(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	if stmt == nil {
-		return 0, nil
+		return nil
 	}
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
-		return 0, errors.New("not select in do Query")
+		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
 	if ss.Where != nil {
@@ -390,21 +404,21 @@ func handleQueryRow(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (in
 		}
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("query arg count mismatch")
+		return errors.New("query arg count mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleQueryRowContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleQueryRowContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	if stmt == nil {
-		return 0, nil
+		return nil
 	}
 	ss, ok := stmt.(*sqlAST.SelectStmt)
 	if !ok {
-		return 0, errors.New("not select in do Query")
+		return errors.New("not select in do Query")
 	}
 	placeHolderNum := 0
 	if ss.Where != nil {
@@ -419,17 +433,17 @@ func handleQueryRowContext(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bo
 		}
 	}
 	if placeHolderNum != 0 && len(args) != 0 && hasEllipsis {
-		return placeHolderNum, nil
+		return nil
 	}
 	if placeHolderNum != len(args) {
-		return 0, errors.New("query arg count mismatch")
+		return errors.New("query arg count mismatch")
 	}
-	return placeHolderNum, nil
+	return nil
 }
 
-func handleExec(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) (int, error) {
+func handleExec(stmt sqlAST.StmtNode, args []ast.Expr, hasEllipsis bool) error {
 	if stmt == nil {
-		return 0, nil
+		return nil
 	}
 	switch t := stmt.(type) {
 	case *sqlAST.InsertStmt:
