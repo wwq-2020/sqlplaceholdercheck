@@ -5,5 +5,7 @@ import (
 )
 
 func (t a) Query(ctx context.Context) {
-	t.db.Query("select id from t where id > ? limit ?", 1)
+	var id int64
+	rows, _ := t.db.Query("select id from t where id > ?", 1)
+	rows.Scan(&id, &id)
 }
