@@ -10,5 +10,5 @@ type a struct {
 }
 
 func (t a) Query(ctx context.Context) {
-	t.db.QueryContext(ctx, "select id from t where id = ?", 1, 2, 3)
+	t.db.Query("select id from t where id = ?", 1, 2, 3)
 }

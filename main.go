@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"go/ast"
 	"strings"
 
@@ -35,46 +36,126 @@ func run(pass *analysis.Pass) (interface{}, error) {
 			if !ok {
 				return true
 			}
-			if se.Sel.Name != "QueryContext" {
+			needArg := 1
+			handler := func(stmt sqlAST.StmtNode, argCnt int) error {
+				return nil
+			}
+			switch se.Sel.Name {
+			case "Query":
+				handler = handleQuery
+			case "QueryContext":
+				handler = handleQueryContext
+				needArg++
+			case "Exec":
+				handler = handleExec
+			case "ExecContext":
+				handler = handleExecContext
+				needArg++
+			case "QueryRow":
+				handler = handleQueryRow
+			case "QueryRowContext":
+				handler = handleQueryRowContext
+				needArg++
+			default:
 				return true
 			}
-			// 至少 ctx, sql
-			if len(ce.Args) < 2 {
+
+			if len(ce.Args) < needArg {
+				pass.Reportf(n.Pos(), "args mismatch")
 				return true
 			}
-			args := ce.Args[2:]
+			argCnt := len(ce.Args[needArg:])
 
 			p := parser.New()
-			sql := strings.TrimPrefix(ce.Args[1].(*ast.BasicLit).Value, "\"")
+			sql := strings.TrimPrefix(ce.Args[needArg-1].(*ast.BasicLit).Value, "\"")
 			sql = strings.TrimSuffix(sql, "\"")
 			sns, _, err := p.Parse(sql, "utf8mb4", "utf8mb4")
 			if err != nil {
 				return true
 			}
 			sn := sns[0]
-			ss := sn.(*sqlAST.SelectStmt)
-			placeHolderNum := calcPlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), 0)
-			if placeHolderNum != len(args) {
-				pass.Reportf(n.Pos(), "args mismatch")
-				return true
+			if err := handler(sn, argCnt); err != nil {
+				pass.Reportf(n.Pos(), err.Error())
+				// pass.Reportf(n.Pos(), "args mismatch")
 			}
+
 			return true
 		})
 	}
 	return nil, nil
 }
 
-func calcPlaceHolderNum(stmt *sqlAST.BinaryOperationExpr, cur int) int {
+func handleQuery(stmt sqlAST.StmtNode, argCnt int) error {
+	ss := stmt.(*sqlAST.SelectStmt)
+	placeHolderNum := calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), 0)
+	if placeHolderNum != argCnt {
+		return errors.New("argcnt mismatch")
+	}
+	return nil
+}
+
+func handleQueryContext(stmt sqlAST.StmtNode, argCnt int) error {
+	ss := stmt.(*sqlAST.SelectStmt)
+	placeHolderNum := calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), 0)
+	if placeHolderNum != argCnt {
+		return errors.New("argcnt mismatch")
+	}
+	return nil
+}
+
+func handleExecContext(stmt sqlAST.StmtNode, argCnt int) error {
+	ss := stmt.(*sqlAST.InsertStmt)
+	placeHolderNum := 0
+	for _, each := range ss.Lists {
+		placeHolderNum += len(each)
+	}
+	if placeHolderNum != argCnt {
+		return errors.New("argcnt mismatch")
+	}
+	return nil
+}
+
+func handleQueryRow(stmt sqlAST.StmtNode, argCnt int) error {
+	ss := stmt.(*sqlAST.SelectStmt)
+	placeHolderNum := calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), 0)
+	if placeHolderNum != argCnt {
+		return errors.New("argcnt mismatch")
+	}
+	return nil
+}
+
+func handleQueryRowContext(stmt sqlAST.StmtNode, argCnt int) error {
+	ss := stmt.(*sqlAST.SelectStmt)
+	placeHolderNum := calcWherePlaceHolderNum(ss.Where.(*sqlAST.BinaryOperationExpr), 0)
+	if placeHolderNum != argCnt {
+		return errors.New("argcnt mismatch")
+	}
+	return nil
+}
+
+func handleExec(stmt sqlAST.StmtNode, argCnt int) error {
+	ss := stmt.(*sqlAST.InsertStmt)
+	placeHolderNum := 0
+	for _, each := range ss.Lists {
+		placeHolderNum += len(each)
+	}
+	if placeHolderNum != argCnt {
+		return errors.New("argcnt mismatch")
+	}
+	return nil
+}
+
+func calcWherePlaceHolderNum(stmt *sqlAST.BinaryOperationExpr, cur int) int {
 	switch t := stmt.L.(type) {
 	case *sqlAST.BinaryOperationExpr:
-		cur = calcPlaceHolderNum(t, cur)
+		cur = calcWherePlaceHolderNum(t, cur)
 	case *driver.ParamMarkerExpr:
 		cur++
 	default:
 	}
 	switch t := stmt.R.(type) {
 	case *sqlAST.BinaryOperationExpr:
-		cur = calcPlaceHolderNum(t, cur)
+		cur = calcWherePlaceHolderNum(t, cur)
 	case *driver.ParamMarkerExpr:
 		cur++
 	default:
