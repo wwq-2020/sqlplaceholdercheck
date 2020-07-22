@@ -189,7 +189,6 @@ func handleScanForQuery(ce *ast.CallExpr, se *ast.SelectorExpr) error {
 		}
 		columnCnt = len(ss.Fields.Fields)
 	}
-	fmt.Println(columnCnt)
 	if columnCnt != len(ce.Args) {
 		return errors.New("scan arg mismatch")
 	}
