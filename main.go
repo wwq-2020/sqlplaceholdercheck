@@ -182,9 +182,14 @@ func handleScanForQuery(ce *ast.CallExpr, se *ast.SelectorExpr) error {
 	ss := sn.(*sqlAST.SelectStmt)
 	columnCnt := 0
 	if ss != nil && ss.Fields != nil {
+		for _, each := range ss.Fields.Fields {
+			if each.WildCard != nil {
+				return nil
+			}
+		}
 		columnCnt = len(ss.Fields.Fields)
 	}
-
+	fmt.Println(columnCnt)
 	if columnCnt != len(ce.Args) {
 		return errors.New("scan arg mismatch")
 	}
@@ -234,7 +239,13 @@ func handleScanForQueryRow(ce, ce2 *ast.CallExpr, se, se2 *ast.SelectorExpr) err
 	ss := sn.(*sqlAST.SelectStmt)
 
 	if ss != nil && ss.Fields != nil {
+		for _, each := range ss.Fields.Fields {
+			if each.WildCard != nil {
+				return nil
+			}
+		}
 		columnCnt = len(ss.Fields.Fields)
+
 	}
 	if columnCnt != len(ce.Args) {
 		return errors.New("scan arg mismatch")
